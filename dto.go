@@ -1,17 +1,17 @@
 package main
 
 type Sub struct {
-	Action  string `json:"action"`
-	Symbols string `json:"symbols"`
+	Action  string   `json:"action"`
+	Symbols []string `json:"symbols"`
 }
 
 type Info struct {
-	Timestamp string `json:"timestamp"`
-	Symbol    string `json:"symbol"`
-	Price     string `json:"price"`
+	Timestamp string  `json:"timestamp"`
+	Symbol    string  `json:"symbol"`
+	Price     float64 `json:"price"`
 }
 
-type Command struct {
+type BitmexCommand struct {
 	Op   string        `json:"op"`
 	Args []interface{} `json:"args"`
 }

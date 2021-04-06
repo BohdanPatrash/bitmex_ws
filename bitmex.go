@@ -5,13 +5,29 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"log"
 	"strconv"
 	"time"
 
 	"github.com/gorilla/websocket"
 )
 
-func SubscribeToBitMex() {
+const (
+	API_KEY    = "ORqVaoVf1TJrVnKexpWjHfjk"
+	API_SECRET = "mvK7p-zYF5He2eistXxXUvASoJWRGvp6eOO5TF2gn4BHI2iB"
+)
+
+type BitmexResponse struct {
+	Data []BitmexData `json:"data"`
+}
+
+type BitmexData struct {
+	Symbol    string  `json:"symbol"`
+	Price     float64 `json:"markPrice"`
+	TimeStamp string  `json:"timestamp"`
+}
+
+func SubscribeToBitMex(bitmexChan chan []BitmexData) {
 	// Establishing connection to bitmex
 	conn, _, err := websocket.DefaultDialer.Dial("wss://testnet.bitmex.com/realtime", nil)
 	if err != nil {
@@ -22,14 +38,14 @@ func SubscribeToBitMex() {
 
 	//Authorizing
 	expires := int(time.Now().Unix() + 3600)
-	auth := &Command{
+	auth := &BitmexCommand{
 		Op:   "authKeyExpires",
 		Args: []interface{}{API_KEY, expires, GetSignature(expires)},
 	}
 	conn.WriteJSON(auth)
 
 	//Subscribing to the instrument
-	sub := &Command{
+	sub := &BitmexCommand{
 		Op:   "subscribe",
 		Args: []interface{}{"instrument"},
 	}
@@ -37,13 +53,16 @@ func SubscribeToBitMex() {
 
 	//Processing received messages
 	for {
-		<-time.After(2 * time.Second)
-		_, msg, err := conn.ReadMessage()
+		response := &BitmexResponse{}
+		// _, msg, err := conn.ReadMessage()
+		err = conn.ReadJSON(response)
 		if err != nil {
-			fmt.Println("ERROR: ", err)
-			break
+			log.Println("ERROR: ", err)
+			continue
 		}
-		fmt.Println("recieved <- : ", string(msg))
+		// log.Println(string(msg))
+		// log.Println("response from bitmex: ", response)
+		bitmexChan <- response.Data
 	}
 }
 
