@@ -3,7 +3,6 @@ package main
 
 import (
 	"fmt"
-	"time"
 
 	"github.com/gorilla/websocket"
 )
@@ -27,18 +26,25 @@ func main() {
 		Symbol    string  `json:"symbol"`
 		Price     float64 `json:"price"`
 	}
-
+	//subing to instrument:XBTUSD
 	conn.WriteJSON(&Sub{
 		Action:  "subscribe",
-		Symbols: []string{},
+		Symbols: []string{"XBTUSD"},
 	})
 
-	for i := 0; i < 200; i++ {
+	for i := 0; i < 5; i++ {
 		info := &Info{}
 		conn.ReadJSON(info)
 		fmt.Println(info)
 	}
-	<-time.After(2 * time.Second)
+
+	//wrong sub command
+	conn.WriteJSON(&Sub{
+		Action:  "asd",
+		Symbols: []string{},
+	})
+
+	//unsubing
 	conn.WriteJSON(&Sub{
 		Action:  "unsubscribe",
 		Symbols: []string{},

@@ -24,7 +24,6 @@ func WShandler(c *gin.Context) {
 	defer conn.Close()
 
 	subChan := readConnection(conn)
-	var subscription Sub
 	connection := &Connection{
 		Info:         make(chan Info),
 		SubSymbols:   make(chan []string),
@@ -34,13 +33,17 @@ func WShandler(c *gin.Context) {
 	}
 	for {
 		select {
-		case subscription = <-subChan:
+		case subscription, ok := <-subChan:
+			if !ok {
+				RemoveConnection(connection)
+				return
+			}
 			processSub(subscription, connection)
 		case info := <-connection.Info:
 			err := conn.WriteJSON(info)
 			if err != nil {
 				RemoveConnection(connection)
-				break
+				return
 			}
 		}
 
