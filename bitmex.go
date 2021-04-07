@@ -54,14 +54,11 @@ func SubscribeToBitMex(bitmexChan chan []BitmexData) {
 	//Processing received messages
 	for {
 		response := &BitmexResponse{}
-		// _, msg, err := conn.ReadMessage()
 		err = conn.ReadJSON(response)
 		if err != nil {
 			log.Println("ERROR: ", err)
 			continue
 		}
-		// log.Println(string(msg))
-		// log.Println("response from bitmex: ", response)
 		bitmexChan <- response.Data
 	}
 }

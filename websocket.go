@@ -14,6 +14,7 @@ var WSupgrader = websocket.Upgrader{
 	WriteBufferSize: 1024,
 }
 
+//Main websocket handler for clients
 func WShandler(c *gin.Context) {
 	conn, err := WSupgrader.Upgrade(c.Writer, c.Request, nil)
 	if err != nil {
@@ -36,7 +37,6 @@ func WShandler(c *gin.Context) {
 		case subscription = <-subChan:
 			processSub(subscription, connection)
 		case info := <-connection.Info:
-			log.Println("info on websocket", info)
 			err := conn.WriteJSON(info)
 			if err != nil {
 				RemoveConnection(connection)
@@ -48,11 +48,11 @@ func WShandler(c *gin.Context) {
 
 }
 
+//reads all incoming jsons from client connection
 func readConnection(conn *websocket.Conn) chan Sub {
 	subChan := make(chan Sub)
 	go func() {
 		for {
-			<-time.After(2 * time.Second)
 			subscription := &Sub{}
 			err := conn.ReadJSON(subscription)
 			if err != nil {
@@ -66,6 +66,7 @@ func readConnection(conn *websocket.Conn) chan Sub {
 	return subChan
 }
 
+//distributes logic by action
 func processSub(subscription Sub, conn *Connection) {
 	switch subscription.Action {
 	case "subscribe":
@@ -77,5 +78,7 @@ func processSub(subscription Sub, conn *Connection) {
 			return
 		}
 		conn.UnsubSymbols <- subscription.Symbols
+	default:
+		log.Println("UnknownCommand")
 	}
 }
