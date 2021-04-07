@@ -15,3 +15,7 @@ type BitmexCommand struct {
 	Op   string        `json:"op"`
 	Args []interface{} `json:"args"`
 }
+
+type Error struct {
+	Message string `json:"error"`
+}

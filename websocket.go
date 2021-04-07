@@ -38,7 +38,7 @@ func WShandler(c *gin.Context) {
 				RemoveConnection(connection)
 				return
 			}
-			processSub(subscription, connection)
+			processSub(subscription, connection, conn)
 		case info := <-connection.Info:
 			err := conn.WriteJSON(info)
 			if err != nil {
@@ -70,7 +70,7 @@ func readConnection(conn *websocket.Conn) chan Sub {
 }
 
 //distributes logic by action
-func processSub(subscription Sub, conn *Connection) {
+func processSub(subscription Sub, conn *Connection, webConn *websocket.Conn) {
 	switch subscription.Action {
 	case "subscribe":
 		AddConnection(conn)
@@ -82,6 +82,7 @@ func processSub(subscription Sub, conn *Connection) {
 		}
 		conn.UnsubSymbols <- subscription.Symbols
 	default:
-		log.Println("UnknownCommand")
+		webConn.WriteJSON(Error{Message: "Unknown command was sent: " + subscription.Action})
+		log.Println("Unknown Command: ", subscription.Action)
 	}
 }

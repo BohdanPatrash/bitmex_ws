@@ -25,6 +25,7 @@ func main() {
 		Timestamp string  `json:"timestamp"`
 		Symbol    string  `json:"symbol"`
 		Price     float64 `json:"price"`
+		Error     string  `jsno:"error"`
 	}
 	//subing to instrument:XBTUSD
 	conn.WriteJSON(&Sub{
@@ -43,6 +44,10 @@ func main() {
 		Action:  "asd",
 		Symbols: []string{},
 	})
+
+	info := &Info{}
+	conn.ReadJSON(info)
+	fmt.Println(info)
 
 	//unsubing
 	conn.WriteJSON(&Sub{
