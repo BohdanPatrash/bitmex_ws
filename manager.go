@@ -2,13 +2,7 @@ package main
 
 import (
 	"log"
-	"sync"
 )
-
-type Clients struct {
-	mu          sync.Mutex
-	connections map[int]*Connection
-}
 
 type Connection struct {
 	Id           int
@@ -18,18 +12,37 @@ type Connection struct {
 	SubSymbols   chan []string
 }
 
-//clients that are connected
-var clients *Clients = &Clients{
-	connections: make(map[int]*Connection),
+type Mux struct {
+	operations chan func(map[int]*Connection)
 }
 
-//ManageConnections sends relative data to the subscribers
-func ManageConnections(bitmexChan chan []BitmexData) {
-	for {
-		data := <-bitmexChan
-		clients.mu.Lock()
+func (m *Mux) ManageConnections() {
+	connections := make(map[int]*Connection)
+	for operation := range m.operations {
+		operation(connections)
+	}
+}
 
-		for _, conn := range clients.connections {
+func (m *Mux) AddConnection(c *Connection) {
+	m.operations <- func(conns map[int]*Connection) {
+		if _, ok := conns[c.Id]; ok {
+			return
+		}
+		conns[c.Id] = c
+		log.Printf("connection ID:%v successfully subscribed!", c.Id)
+	}
+}
+
+func (m *Mux) RemoveConnection(c *Connection) {
+	m.operations <- func(conns map[int]*Connection) {
+		delete(conns, c.Id)
+		log.Printf("connection ID:%v successfully unsubscribed!", c.Id)
+	}
+}
+
+func (m *Mux) BitmexUpdate(data []BitmexData) {
+	m.operations <- func(conns map[int]*Connection) {
+		for _, conn := range conns {
 			for _, val := range data {
 				if _, ok := conn.Symbols[val.Symbol]; ok || len(conn.Symbols) == 0 {
 					conn.Info <- Info{
@@ -39,53 +52,24 @@ func ManageConnections(bitmexChan chan []BitmexData) {
 					}
 				}
 			}
-
 		}
-
-		clients.mu.Unlock()
 	}
 }
 
-//AddConnection adds connection if it doesn't exist already
-func AddConnection(c *Connection) {
-	clients.mu.Lock()
-	defer clients.mu.Unlock()
-	if _, ok := clients.connections[c.Id]; ok {
-		return
-	}
-	clients.connections[c.Id] = c
-	listenSubUpdate(clients.connections[c.Id])
-	log.Printf("connection ID:%v successfully subscribed!", c.Id)
-}
-
-//RemoveConnection removes existing connection
-func RemoveConnection(c *Connection) {
-	clients.mu.Lock()
-	delete(clients.connections, c.Id)
-	log.Printf("connection ID:%v successfully unsubscribed!", c.Id)
-	clients.mu.Unlock()
-}
-
-//listenSubUpdate listening to updates on existing connections and updates subscribed symbols
-func listenSubUpdate(c *Connection) {
-	go func() {
-		for {
-			select {
-			case symbols := <-c.SubSymbols:
-				clients.mu.Lock()
-				for _, v := range symbols {
-					c.Symbols[v] = struct{}{}
-					log.Printf("connection ID:%v successfully subscribed to %v", c.Id, v)
-				}
-				clients.mu.Unlock()
-			case symbols := <-c.UnsubSymbols:
-				clients.mu.Lock()
-				for _, v := range symbols {
-					delete(c.Symbols, v)
-					log.Printf("connection ID:%v successfully unsubscribed from %v", c.Id, v)
-				}
-				clients.mu.Unlock()
-			}
+func (m *Mux) Subscribe(id int, symbols []string) {
+	m.operations <- func(conns map[int]*Connection) {
+		for _, v := range symbols {
+			conns[id].Symbols[v] = struct{}{}
+			log.Printf("connection ID:%v successfully subscribed to %v", id, v)
 		}
-	}()
+	}
+}
+
+func (m *Mux) Unsubscribe(id int, symbols []string) {
+	m.operations <- func(conns map[int]*Connection) {
+		for _, v := range symbols {
+			delete(conns[id].Symbols, v)
+			log.Printf("connection ID:%v successfully unsubscribed from %v", id, v)
+		}
+	}
 }

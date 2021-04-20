@@ -5,20 +5,23 @@ import (
 )
 
 func main() {
-	bitmexChan := make(chan []BitmexData)
-	go SubscribeToBitMex(bitmexChan)
-	go ManageConnections(bitmexChan)
-	startServer()
+	// bitmexChan := make(chan []BitmexData)
+	mux := &Mux{
+		operations: make(chan func(map[int]*Connection)),
+	}
+	go SubscribeToBitMex(mux)
+	go mux.ManageConnections()
+	startServer(mux)
 }
 
-func startServer() {
+func startServer(mux *Mux) {
 	r := gin.Default()
 	r.Use(errorHandler())
 	r.GET("/", func(c *gin.Context) {
 		c.String(200, "Hello, to use websocket connect to /ws via websocket connection")
 	})
 	r.GET("/ws", func(c *gin.Context) {
-		WShandler(c)
+		WShandler(c, mux)
 	})
 	r.Run("localhost:8081")
 }

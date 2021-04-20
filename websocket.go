@@ -15,7 +15,7 @@ var WSupgrader = websocket.Upgrader{
 }
 
 //Main websocket handler for clients
-func WShandler(c *gin.Context) {
+func WShandler(c *gin.Context, mux *Mux) {
 	conn, err := WSupgrader.Upgrade(c.Writer, c.Request, nil)
 	if err != nil {
 		c.Error(fmt.Errorf("Failed to set websocket upgrade: %v.\n", err))
@@ -25,24 +25,24 @@ func WShandler(c *gin.Context) {
 
 	subChan := readConnection(conn)
 	connection := &Connection{
-		Info:         make(chan Info),
-		SubSymbols:   make(chan []string),
-		UnsubSymbols: make(chan []string),
-		Symbols:      make(map[string]struct{}),
-		Id:           int(time.Now().UnixNano()), //not ideal but kinda unique for the matter
+		Info: make(chan Info),
+		// SubSymbols:   make(chan []string),
+		// UnsubSymbols: make(chan []string),
+		Symbols: make(map[string]struct{}),
+		Id:      int(time.Now().UnixNano()), //not ideal but kinda unique for the matter
 	}
 	for {
 		select {
 		case subscription, ok := <-subChan:
 			if !ok {
-				RemoveConnection(connection)
+				mux.RemoveConnection(connection)
 				return
 			}
-			processSub(subscription, connection, conn)
+			processSub(mux, subscription, connection, conn)
 		case info := <-connection.Info:
 			err := conn.WriteJSON(info)
 			if err != nil {
-				RemoveConnection(connection)
+				mux.RemoveConnection(connection)
 				return
 			}
 		}
@@ -70,17 +70,17 @@ func readConnection(conn *websocket.Conn) chan Sub {
 }
 
 //distributes logic by action
-func processSub(subscription Sub, conn *Connection, webConn *websocket.Conn) {
+func processSub(mux *Mux, subscription Sub, conn *Connection, webConn *websocket.Conn) {
 	switch subscription.Action {
 	case "subscribe":
-		AddConnection(conn)
-		conn.SubSymbols <- subscription.Symbols
+		mux.AddConnection(conn)
+		mux.Subscribe(conn.Id, subscription.Symbols)
 	case "unsubscribe":
 		if len(subscription.Symbols) == 0 {
-			RemoveConnection(conn)
+			mux.RemoveConnection(conn)
 			return
 		}
-		conn.UnsubSymbols <- subscription.Symbols
+		mux.Unsubscribe(conn.Id, subscription.Symbols)
 	default:
 		webConn.WriteJSON(Error{Message: "Unknown command was sent: " + subscription.Action})
 		log.Println("Unknown Command: ", subscription.Action)

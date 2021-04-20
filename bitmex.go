@@ -27,7 +27,7 @@ type BitmexData struct {
 	TimeStamp string  `json:"timestamp"`
 }
 
-func SubscribeToBitMex(bitmexChan chan []BitmexData) {
+func SubscribeToBitMex(mux *Mux) {
 	// Establishing connection to bitmex
 	conn, _, err := websocket.DefaultDialer.Dial("wss://testnet.bitmex.com/realtime", nil)
 	if err != nil {
@@ -59,7 +59,7 @@ func SubscribeToBitMex(bitmexChan chan []BitmexData) {
 			log.Println("ERROR: ", err)
 			continue
 		}
-		bitmexChan <- response.Data
+		mux.BitmexUpdate(response.Data)
 	}
 }
 
